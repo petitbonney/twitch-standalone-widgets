@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<head>
+  <script src="https://cdn.jsdelivr.net/gh/petitbonney/twitch-standalone-widgets@master/libs/tmi.min.js"></script>
+</head>
+<body>
+  <script>
+    const url = new URLSearchParams(location.search);
+
+    let options = {};
+    if (url.has("channels")) {
+      options["channels"] = url.get("channels").split(",");
+    }
+    if (url.has("username") && url.has("token")) {
+      options["identity"] = {
+        username: url.get("username"),
+        password: url.get("token"),
+      };
+    }
+
+    const client = new tmi.Client(options);
+    client.connect().catch(console.error);
+    client.on("message", (channel, tags, message, self) => {
+      console.log(`[${channel}] ${tags.username}: ${message}`);
+      // Your code here...
+    });
+  </script>
+</body>

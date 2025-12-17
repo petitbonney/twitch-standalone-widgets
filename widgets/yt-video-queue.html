@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<head>
+  <script src="https://cdn.jsdelivr.net/gh/petitbonney/twitch-standalone-widgets@master/libs/tmi.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/petitbonney/twitch-standalone-widgets@master/libs/video.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/petitbonney/twitch-standalone-widgets@master/libs/youtube.min.js"></script>
+  <link
+    href="https://unpkg.com/video.js@8.23.4/dist/video-js.min.css"
+    rel="stylesheet"
+  />
+  <style>
+    body {
+      margin: 0;
+      height: 100vh;
+    }
+    .video-js {
+      width: 100%;
+      height: 100%;
+    }
+  </style>
+</head>
+<body>
+  <script>
+    const BOOLEAN_REGEX = /^(?!\s*$)(?!false$)(?!0$).+/;
+    const YOUTUBE_REGEX =
+      /((?:(?:https?:)?\/\/)?(?:(?:www|m)\.)?(?:(?:youtube\.com|youtu.be))(?:\/(?:[\w\-]+\?v=|embed\/|v\/)?)(?:[\w\-]+)(?:\S+)?)/m;
+
+    const url = new URLSearchParams(location.search);
+
+    const duration = url.get("duration") ?? 10; // duration in seconds, default: 10
+    const rewardId = url.get("reward-id"); // trigger on channel points reward
+    const command = url.get("command"); // trigger on !command
+    const controls = url.get("controls")?.match(BOOLEAN_REGEX)?.length > 0; // display youtube controls
+
+    const disposeAll = () =>
+      videojs.getAllPlayers().forEach((e) => e.dispose());
+
+    const createPlayer = () => {
+      const player = document.createElement("video");
+      player.classList.add("video-js", "vjs-default-skin");
+      document.body.appendChild(player);
+      return player;
+    };
+
+    const createVideo = (player, src) =>
+      videojs(player, {
+        autoplay: true,
+        muted: false,
+        controls: false,
+        techOrder: ["youtube"],
+        youtube: {
+          ytControls: +controls,
+        },
+        sources: {
+          type: "video/youtube",
+          src: src,
+        },
+      });
+
+    const changeVideo = (src) => {
+      disposeAll();
+      if (src) createVideo(createPlayer(), src);
+    };
+
+    let queue = [];
+    setInterval(() => {
+      const el = queue.shift();
+      changeVideo(el);
+    }, duration * 1e3);
+
+    const callback = (channel, tags, message, self) => {
+      if (command) {
+        const head = message.split(" ")[0];
+        if (head == `!${command}`) {
+          const links = message.match(YOUTUBE_REGEX);
+          if (links) queue.push(links[0].replace("t=", "start="));
+        }
+      }
+      if (rewardId) {
+        if (tags["custom-reward-id"] == rewardId) {
+          const links = message.match(YOUTUBE_REGEX);
+          if (links) queue.push(links[0].replace("t=", "start="));
+        }
+      }
+    };
+
+    let options = {};
+    if (url.has("channels")) {
+      options["channels"] = url.get("channels").split(",");
+    }
+    if (url.has("username") && url.has("token")) {
+      options["identity"] = {
+        username: url.get("username"),
+        password: url.get("token"),
+      };
+    }
+
+    const client = new tmi.Client(options);
+    client.connect().catch(console.error);
+    client.on("message", callback);
+  </script>
+</body>
